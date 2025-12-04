@@ -26,8 +26,25 @@
     </div>
     <div class="panel">
       <div class="control">
+        <label>Tools</label>
+        <div class="tool-grid" role="group" aria-label="Drawing tools">
+          <button type="button" class="tool active" data-tool="brush">Brush</button>
+          <button type="button" class="tool" data-tool="pen">Pen</button>
+          <button type="button" class="tool" data-tool="pencil">Pencil</button>
+          <button type="button" class="tool" data-tool="marker">Marker</button>
+          <button type="button" class="tool" data-tool="highlighter">Highlighter</button>
+        </div>
+      </div>
+      <div class="control">
         <label for="color">Stroke color</label>
         <input type="color" id="color" value="#2b6eff">
+      </div>
+      <div class="control">
+        <label for="background">Canvas background</label>
+        <div class="background-row">
+          <input type="color" id="background" value="#ffffff" aria-label="Background color">
+          <button id="setBackground" type="button" class="ghost">Set background</button>
+        </div>
       </div>
       <div class="control">
         <label for="size">Brush size</label>

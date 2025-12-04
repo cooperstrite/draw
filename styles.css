@@ -79,6 +79,36 @@ h1 {
   align-items: center;
 }
 
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.tool {
+  width: 100%;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  text-align: left;
+  font-weight: 600;
+}
+
+.tool.active {
+  background: linear-gradient(135deg, rgba(58, 123, 255, 0.15), rgba(58, 123, 255, 0.05));
+  border-color: rgba(58, 123, 255, 0.5);
+  box-shadow: 0 10px 30px rgba(58, 123, 255, 0.25);
+}
+
+.background-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
 .control label {
   font-size: 13px;
   color: #dfe6ff;
