@@ -14,7 +14,7 @@ const backgroundInput = document.getElementById("background");
 const setBackgroundBtn = document.getElementById("setBackground");
 
 const tools = {
-  brush: { widthScale: 1, opacityScale: 1, composite: "source-over", lineCap: "round", mode: "smooth" },
+  brush: { widthScale: 1, opacityScale: 1, composite: "source-over", lineCap: "round", mode: "watercolor" },
   pen: { widthScale: 0.75, opacityScale: 1, composite: "source-over", lineCap: "butt", mode: "ink" },
   pencil: { widthScale: 0.5, opacityScale: 0.5, composite: "source-over", lineCap: "round", mode: "jitter" },
   marker: { widthScale: 1.25, opacityScale: 0.8, composite: "source-over", lineCap: "square", mode: "marker" },
@@ -253,6 +253,34 @@ function paintStroke(targetCtx, points, tool, width, color) {
   targetCtx.globalAlpha = 1;
 
   switch (tool.mode) {
+    case "watercolor":
+      const w = Math.max(width, 3.2);
+      targetCtx.lineCap = "round";
+      targetCtx.lineJoin = "round";
+      // soft wash base
+      targetCtx.filter = "blur(0.6px)";
+      targetCtx.globalAlpha = 0.65;
+      targetCtx.lineWidth = w * 1.12;
+      drawPath(targetCtx, points);
+      // main stroke with tiny jitter
+      targetCtx.filter = "none";
+      targetCtx.globalAlpha = 0.95;
+      targetCtx.lineWidth = w * 1.02;
+      drawPath(targetCtx, jitterPoints(points, w * 0.05));
+      // bristly edge with dash gaps
+      targetCtx.globalAlpha = 0.55;
+      targetCtx.lineWidth = w * 1.1;
+      targetCtx.setLineDash([w * 0.45, w * 0.45]);
+      drawPath(targetCtx, jitterPoints(points, w * 0.14));
+      targetCtx.setLineDash([]);
+      // sparse speckles for texture
+      targetCtx.globalAlpha = 0.35;
+      scatterStroke(targetCtx, points, w * 0.2);
+      // crisp core line for visibility on thin strokes
+      targetCtx.globalAlpha = 0.5;
+      targetCtx.lineWidth = Math.max(w * 0.55, 2.2);
+      drawPath(targetCtx, points);
+      break;
     case "jitter":
       drawPath(targetCtx, points);
       targetCtx.globalAlpha = 0.5;
@@ -319,4 +347,19 @@ function hexToRgba(hex, alpha = 1) {
   const g = (int >> 8) & 255;
   const b = int & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function scatterStroke(targetCtx, points, radius) {
+  for (let i = 0; i < points.length; i += Math.max(1, Math.floor(points.length / 25))) {
+    const p = points[i];
+    const count = 3;
+    for (let j = 0; j < count; j++) {
+      const offsetX = (Math.random() - 0.5) * radius * 2;
+      const offsetY = (Math.random() - 0.5) * radius * 2;
+      const r = Math.max(0.5, (Math.random() * radius) / 2);
+      targetCtx.beginPath();
+      targetCtx.arc(p.x + offsetX, p.y + offsetY, r, 0, Math.PI * 2);
+      targetCtx.fill();
+    }
+  }
 }
