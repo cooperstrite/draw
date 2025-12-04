@@ -6,3 +6,6 @@ Small in-browser sketch pad. Open `index.html` in your browser and draw with you
 - Workflow: `.github/workflows/deploy.yml` deploys the repository root to Pages on pushes to `main` (or via manual dispatch).
 - First-time setup: in the repo Settings → Pages, choose "GitHub Actions" as the source.
 - After a run, the published site URL will appear in the Pages environment output in the workflow logs.
+
+## Cover image
+- `assets/cover.png` is used for social previews (Open Graph/Twitter) and as the favicon.
