@@ -11,11 +11,13 @@ const undoBtn = document.getElementById("undo");
 const eraserBtn = document.getElementById("eraser");
 
 let drawing = false;
-let lastX = 0;
-let lastY = 0;
 let history = [];
 let historyStep = -1;
 let usingEraser = false;
+let strokePoints = [];
+let baseSnapshot = null;
+const strokeLayer = document.createElement("canvas");
+const strokeCtx = strokeLayer.getContext("2d");
 
 function setCanvasSize() {
   const dataUrl = canvas.toDataURL();
@@ -26,6 +28,7 @@ function setCanvasSize() {
   img.onload = () => {
     canvas.width = width;
     canvas.height = height;
+    syncStrokeLayerSize();
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -50,30 +53,79 @@ function restoreSnapshot() {
 function startDrawing(e) {
   drawing = true;
   const pos = getPos(e);
-  lastX = pos.x;
-  lastY = pos.y;
+  strokePoints = [pos];
+  baseSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  renderStroke();
 }
 
 function stopDrawing() {
   if (!drawing) return;
   drawing = false;
+  renderStroke();
+  strokePoints = [];
+  baseSnapshot = null;
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   saveSnapshot();
 }
 
 function draw(e) {
   if (!drawing) return;
-  const { x, y } = getPos(e);
-  ctx.strokeStyle = usingEraser ? "#ffffff" : withOpacity(colorInput.value, opacityInput.value);
-  ctx.lineWidth = Number(sizeInput.value);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+  strokePoints.push(getPos(e));
+  renderStroke();
+}
 
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  lastX = x;
-  lastY = y;
+function renderStroke() {
+  if (!baseSnapshot || strokePoints.length === 0) return;
+
+  ctx.putImageData(baseSnapshot, 0, 0);
+  const [first, ...rest] = strokePoints;
+
+  if (usingEraser) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineWidth = Number(sizeInput.value);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (!rest.length) {
+      ctx.beginPath();
+      ctx.arc(first.x, first.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(first.x, first.y);
+      for (const point of rest) {
+        ctx.lineTo(point.x, point.y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    return;
+  }
+
+  strokeCtx.clearRect(0, 0, strokeLayer.width, strokeLayer.height);
+  strokeCtx.lineWidth = Number(sizeInput.value);
+  strokeCtx.lineCap = "round";
+  strokeCtx.lineJoin = "round";
+  strokeCtx.strokeStyle = colorInput.value;
+  strokeCtx.fillStyle = colorInput.value;
+
+  if (!rest.length) {
+    strokeCtx.beginPath();
+    strokeCtx.arc(first.x, first.y, strokeCtx.lineWidth / 2, 0, Math.PI * 2);
+    strokeCtx.fill();
+  } else {
+    strokeCtx.beginPath();
+    strokeCtx.moveTo(first.x, first.y);
+    for (const point of rest) {
+      strokeCtx.lineTo(point.x, point.y);
+    }
+    strokeCtx.stroke();
+  }
+
+  ctx.globalAlpha = Number(opacityInput.value);
+  ctx.drawImage(strokeLayer, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
 }
 
 function getPos(e) {
@@ -84,14 +136,6 @@ function getPos(e) {
     x: ((clientX - rect.left) / rect.width) * canvas.width,
     y: ((clientY - rect.top) / rect.height) * canvas.height,
   };
-}
-
-function withOpacity(hex, alpha) {
-  const bigint = parseInt(hex.slice(1), 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function clearCanvas() {
@@ -116,7 +160,13 @@ function downloadImage() {
 function init() {
   canvas.width = canvas.getBoundingClientRect().width;
   canvas.height = canvas.getBoundingClientRect().height;
+  syncStrokeLayerSize();
   clearCanvas();
+}
+
+function syncStrokeLayerSize() {
+  strokeLayer.width = canvas.width;
+  strokeLayer.height = canvas.height;
 }
 
 sizeInput.addEventListener("input", () => {
