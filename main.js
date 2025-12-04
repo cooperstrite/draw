@@ -12,6 +12,11 @@ const eraserBtn = document.getElementById("eraser");
 const toolButtons = Array.from(document.querySelectorAll(".tool"));
 const backgroundInput = document.getElementById("background");
 const setBackgroundBtn = document.getElementById("setBackground");
+const addLayerBtn = document.getElementById("addLayer");
+const layerList = document.getElementById("layerList");
+const layerUpBtn = document.getElementById("layerUp");
+const layerDownBtn = document.getElementById("layerDown");
+const deleteLayerBtn = document.getElementById("deleteLayer");
 
 const tools = {
   brush: { widthScale: 1, opacityScale: 1, composite: "source-over", lineCap: "round", mode: "watercolor" },
@@ -28,30 +33,45 @@ let usingEraser = false;
 let strokePoints = [];
 let backgroundColor = "#ffffff";
 let selectedTool = "brush";
+let layers = [];
+let activeLayerId = null;
+let layerCounter = 1;
 
 const strokeLayer = document.createElement("canvas");
 const strokeCtx = strokeLayer.getContext("2d");
-const drawingLayer = document.createElement("canvas");
-const drawingCtx = drawingLayer.getContext("2d");
+
+function createLayer(name, id) {
+  const layerCanvas = document.createElement("canvas");
+  layerCanvas.width = canvas.width;
+  layerCanvas.height = canvas.height;
+  const layerCtx = layerCanvas.getContext("2d");
+  return { id: id ?? `layer-${Date.now()}-${Math.random()}`, name, visible: true, canvas: layerCanvas, ctx: layerCtx };
+}
 
 function setCanvasSize() {
   const { width, height } = canvas.getBoundingClientRect();
   if (canvas.width === width && canvas.height === height) return;
 
-  const tempDrawing = document.createElement("canvas");
-  tempDrawing.width = drawingLayer.width;
-  tempDrawing.height = drawingLayer.height;
-  const tempCtx = tempDrawing.getContext("2d");
-  tempCtx.drawImage(drawingLayer, 0, 0);
+  const copies = layers.map((layer) => {
+    const temp = document.createElement("canvas");
+    temp.width = layer.canvas.width;
+    temp.height = layer.canvas.height;
+    temp.getContext("2d").drawImage(layer.canvas, 0, 0);
+    return { layer, temp };
+  });
 
   canvas.width = width;
   canvas.height = height;
   strokeLayer.width = width;
   strokeLayer.height = height;
-  drawingLayer.width = width;
-  drawingLayer.height = height;
 
-  drawingCtx.drawImage(tempDrawing, 0, 0, width, height);
+  layers.forEach((layer, i) => {
+    const copy = copies[i].temp;
+    layer.canvas.width = width;
+    layer.canvas.height = height;
+    layer.ctx.drawImage(copy, 0, 0, width, height);
+  });
+
   drawBase();
   saveSnapshot(true);
 }
@@ -60,10 +80,13 @@ function saveSnapshot(skipTruncate = false) {
   if (!skipTruncate) {
     history = history.slice(0, historyStep + 1);
   }
-  history.push({
-    imageData: drawingCtx.getImageData(0, 0, drawingLayer.width, drawingLayer.height),
-    background: backgroundColor,
-  });
+  const layerData = layers.map((l) => ({
+    id: l.id,
+    name: l.name,
+    visible: l.visible,
+    imageData: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height),
+  }));
+  history.push({ background: backgroundColor, activeId: activeLayerId, layers: layerData });
   historyStep = history.length - 1;
 }
 
@@ -72,11 +95,25 @@ function restoreSnapshot() {
   const snap = history[historyStep];
   backgroundColor = snap.background;
   backgroundInput.value = backgroundColor;
-  drawingCtx.putImageData(snap.imageData, 0, 0);
+
+  layers = snap.layers.map((l) => {
+    const layer = createLayer(l.name, l.id);
+    layer.visible = l.visible;
+    if (layer.canvas.width !== l.imageData.width || layer.canvas.height !== l.imageData.height) {
+      layer.canvas.width = l.imageData.width;
+      layer.canvas.height = l.imageData.height;
+    }
+    layer.ctx.putImageData(l.imageData, 0, 0);
+    return layer;
+  });
+  layerCounter = layers.length;
+  activeLayerId = snap.activeId && layers.find((l) => l.id === snap.activeId) ? snap.activeId : layers[0]?.id || null;
+  renderLayerList();
   drawBase();
 }
 
 function startDrawing(e) {
+  if (!getActiveLayer()) return;
   drawing = true;
   strokePoints = [getPos(e)];
   renderStroke(false);
@@ -98,6 +135,8 @@ function draw(e) {
 function renderStroke(commit = false) {
   drawBase();
   if (strokePoints.length === 0) return;
+  const activeLayer = getActiveLayer();
+  if (!activeLayer) return;
 
   const tool = tools[selectedTool] || tools.brush;
   const width = Number(sizeInput.value) * (tool.widthScale || 1);
@@ -111,10 +150,10 @@ function renderStroke(commit = false) {
     ctx.drawImage(strokeLayer, 0, 0);
     ctx.globalCompositeOperation = "source-over";
     if (commit) {
-      drawingCtx.save();
-      drawingCtx.globalCompositeOperation = "destination-out";
-      drawingCtx.drawImage(strokeLayer, 0, 0);
-      drawingCtx.restore();
+      activeLayer.ctx.save();
+      activeLayer.ctx.globalCompositeOperation = "destination-out";
+      activeLayer.ctx.drawImage(strokeLayer, 0, 0);
+      activeLayer.ctx.restore();
       drawBase();
       saveSnapshot();
     }
@@ -131,11 +170,11 @@ function renderStroke(commit = false) {
   ctx.globalCompositeOperation = "source-over";
 
   if (commit) {
-    drawingCtx.save();
-    drawingCtx.globalAlpha = alpha;
-    drawingCtx.globalCompositeOperation = composite;
-    drawingCtx.drawImage(strokeLayer, 0, 0);
-    drawingCtx.restore();
+    activeLayer.ctx.save();
+    activeLayer.ctx.globalAlpha = alpha;
+    activeLayer.ctx.globalCompositeOperation = composite;
+    activeLayer.ctx.drawImage(strokeLayer, 0, 0);
+    activeLayer.ctx.restore();
     drawBase();
     saveSnapshot();
   }
@@ -152,7 +191,7 @@ function getPos(e) {
 }
 
 function clearCanvas() {
-  drawingCtx.clearRect(0, 0, drawingLayer.width, drawingLayer.height);
+  layers.forEach((layer) => layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height));
   drawBase();
   saveSnapshot();
 }
@@ -176,10 +215,13 @@ function init() {
   canvas.height = canvas.getBoundingClientRect().height;
   strokeLayer.width = canvas.width;
   strokeLayer.height = canvas.height;
-  drawingLayer.width = canvas.width;
-  drawingLayer.height = canvas.height;
-  drawingCtx.clearRect(0, 0, drawingLayer.width, drawingLayer.height);
   backgroundColor = backgroundInput.value;
+
+  const baseLayer = createLayer(`Layer ${layerCounter++}`);
+  layers.push(baseLayer);
+  activeLayerId = baseLayer.id;
+
+  renderLayerList();
   drawBase();
   saveSnapshot(true);
   selectTool(selectedTool);
@@ -214,6 +256,51 @@ toolButtons.forEach((btn) => {
   });
 });
 
+addLayerBtn.addEventListener("click", () => {
+  const layer = createLayer(`Layer ${layerCounter++}`);
+  const idx = findLayerIndex(activeLayerId);
+  const insertAt = idx >= 0 ? idx + 1 : layers.length;
+  layers.splice(insertAt, 0, layer);
+  activeLayerId = layer.id;
+  renderLayerList();
+  drawBase();
+  saveSnapshot();
+});
+
+layerUpBtn.addEventListener("click", () => moveLayer(1));
+layerDownBtn.addEventListener("click", () => moveLayer(-1));
+deleteLayerBtn.addEventListener("click", () => {
+  if (layers.length <= 1) return;
+  const idx = findLayerIndex(activeLayerId);
+  if (idx === -1) return;
+  layers.splice(idx, 1);
+  const newIdx = Math.max(0, idx - 1);
+  activeLayerId = layers[newIdx]?.id || layers[0]?.id || null;
+  renderLayerList();
+  drawBase();
+  saveSnapshot();
+});
+
+layerList.addEventListener("click", (e) => {
+  const actionBtn = e.target.closest("[data-action]");
+  const row = e.target.closest(".layer-row");
+  const id = actionBtn?.dataset.id || row?.dataset.id;
+  if (!id) return;
+
+  if (actionBtn?.dataset.action === "toggle") {
+    const layer = layers.find((l) => l.id === id);
+    if (!layer) return;
+    layer.visible = !layer.visible;
+    renderLayerList();
+    drawBase();
+    saveSnapshot();
+    return;
+  }
+
+  activeLayerId = id;
+  renderLayerList();
+});
+
 canvas.addEventListener("pointerdown", startDrawing);
 canvas.addEventListener("pointermove", draw);
 canvas.addEventListener("pointerup", stopDrawing);
@@ -232,12 +319,54 @@ function selectTool(toolName) {
   toolButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.tool === toolName));
 }
 
+function getActiveLayer() {
+  return layers.find((l) => l.id === activeLayerId) || null;
+}
+
 function drawBase() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(drawingLayer, 0, 0);
+  layers.forEach((layer) => {
+    if (layer.visible) {
+      ctx.drawImage(layer.canvas, 0, 0);
+    }
+  });
+}
+
+function moveLayer(delta) {
+  const idx = findLayerIndex(activeLayerId);
+  if (idx === -1) return;
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= layers.length) return;
+  const [layer] = layers.splice(idx, 1);
+  layers.splice(newIdx, 0, layer);
+  renderLayerList();
+  drawBase();
+  saveSnapshot();
+}
+
+function findLayerIndex(id) {
+  return layers.findIndex((l) => l.id === id);
+}
+
+function renderLayerList() {
+  const rows = [...layers]
+    .map((layer, i) => {
+      const isActive = layer.id === activeLayerId;
+      const topIndex = layers.length - i;
+      return `<div class="layer-row ${isActive ? "active" : ""}" data-id="${layer.id}">
+        <span class="name">${layer.name} ( #${topIndex} )</span>
+        <span class="hint">${layer.visible ? "Visible" : "Hidden"}</span>
+        <div class="controls">
+          <button class="mini-btn ghost" data-action="toggle" data-id="${layer.id}">${layer.visible ? "Hide" : "Show"}</button>
+        </div>
+      </div>`;
+    })
+    .reverse()
+    .join("");
+  layerList.innerHTML = rows || "<p class='hint'>No layers</p>";
 }
 
 function paintStroke(targetCtx, points, tool, width, color) {
@@ -253,34 +382,30 @@ function paintStroke(targetCtx, points, tool, width, color) {
   targetCtx.globalAlpha = 1;
 
   switch (tool.mode) {
-    case "watercolor":
+    case "watercolor": {
       const w = Math.max(width, 3.2);
       targetCtx.lineCap = "round";
       targetCtx.lineJoin = "round";
-      // soft wash base
       targetCtx.filter = "blur(0.6px)";
       targetCtx.globalAlpha = 0.65;
       targetCtx.lineWidth = w * 1.12;
       drawPath(targetCtx, points);
-      // main stroke with tiny jitter
       targetCtx.filter = "none";
       targetCtx.globalAlpha = 0.95;
       targetCtx.lineWidth = w * 1.02;
       drawPath(targetCtx, jitterPoints(points, w * 0.05));
-      // bristly edge with dash gaps
       targetCtx.globalAlpha = 0.55;
       targetCtx.lineWidth = w * 1.1;
       targetCtx.setLineDash([w * 0.45, w * 0.45]);
       drawPath(targetCtx, jitterPoints(points, w * 0.14));
       targetCtx.setLineDash([]);
-      // sparse speckles for texture
       targetCtx.globalAlpha = 0.35;
       scatterStroke(targetCtx, points, w * 0.2);
-      // crisp core line for visibility on thin strokes
       targetCtx.globalAlpha = 0.5;
       targetCtx.lineWidth = Math.max(w * 0.55, 2.2);
       drawPath(targetCtx, points);
       break;
+    }
     case "jitter":
       drawPath(targetCtx, points);
       targetCtx.globalAlpha = 0.5;

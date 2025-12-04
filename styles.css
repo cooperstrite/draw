@@ -109,6 +109,61 @@ h1 {
   align-items: center;
 }
 
+.layer-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.layer-list {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  max-height: 400px;
+  overflow: auto;
+}
+
+.layer-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+
+.layer-row.active {
+  background: linear-gradient(135deg, rgba(58, 123, 255, 0.12), rgba(58, 123, 255, 0.04));
+  border-color: rgba(58, 123, 255, 0.5);
+}
+
+.layer-row .name {
+  font-weight: 600;
+}
+
+.layer-row .controls {
+  display: flex;
+  gap: 8px;
+}
+
+.layer-row .mini-btn {
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.layer-row .hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .control label {
   font-size: 13px;
   color: #dfe6ff;
@@ -158,6 +213,11 @@ button:hover {
   transform: translateY(-1px);
 }
 
+.danger {
+  color: #ffb7b7;
+  border-color: rgba(255, 112, 112, 0.2);
+}
+
 .primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-strong));
   box-shadow: 0 12px 30px rgba(58, 123, 255, 0.3);
@@ -169,7 +229,7 @@ button:hover {
 }
 
 .workspace {
-  margin-top: 24px;
+  margin-top: 0;
 }
 
 .canvas-shell {
@@ -197,6 +257,19 @@ canvas {
   font-size: 13px;
 }
 
+.workspace-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.layers-panel {
+  position: sticky;
+  top: 16px;
+}
+
 @media (max-width: 720px) {
   body {
     padding: 16px;
@@ -209,5 +282,13 @@ canvas {
 
   .control.inline {
     grid-template-columns: 1fr;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .layers-panel {
+    position: static;
   }
 }

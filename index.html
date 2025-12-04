@@ -63,10 +63,26 @@
     </div>
   </header>
 
-  <main class="workspace">
-    <div class="canvas-shell">
-      <canvas id="canvas"></canvas>
-    </div>
+  <main class="workspace-grid">
+    <aside class="layers-panel">
+      <div class="panel">
+        <div class="control">
+          <label>Layers</label>
+          <div class="layer-actions">
+            <button type="button" class="ghost" id="addLayer">Add layer</button>
+            <button type="button" class="ghost" id="layerUp">Move up</button>
+            <button type="button" class="ghost" id="layerDown">Move down</button>
+            <button type="button" class="ghost danger" id="deleteLayer">Delete</button>
+          </div>
+          <div id="layerList" class="layer-list" aria-label="Layers"></div>
+        </div>
+      </div>
+    </aside>
+    <section class="workspace">
+      <div class="canvas-shell">
+        <canvas id="canvas"></canvas>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
