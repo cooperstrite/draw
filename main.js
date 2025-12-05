@@ -22,6 +22,7 @@ const zoomRange = document.getElementById("zoomRange");
 const zoomValue = document.getElementById("zoomValue");
 const zoomInBtn = document.getElementById("zoomIn");
 const zoomOutBtn = document.getElementById("zoomOut");
+const toggleGridBtn = document.getElementById("toggleGrid");
 
 const tools = {
   brush: { widthScale: 1, opacityScale: 1, composite: "source-over", lineCap: "round", mode: "watercolor" },
@@ -42,6 +43,7 @@ let layers = [];
 let activeLayerId = null;
 let layerCounter = 1;
 let workspaceSize = 3200;
+let showGrid = false;
 let spaceHeld = false;
 let isPanning = false;
 let lastPanPoint = { x: 0, y: 0 };
@@ -237,6 +239,13 @@ setBackgroundBtn.addEventListener("click", () => {
   saveSnapshot();
 });
 
+toggleGridBtn?.addEventListener("click", () => {
+  showGrid = !showGrid;
+  toggleGridBtn.classList.toggle("primary", showGrid);
+  toggleGridBtn.textContent = showGrid ? "Grid: On" : "Grid";
+  drawBase();
+});
+
 toolButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     selectTool(btn.dataset.tool);
@@ -351,11 +360,32 @@ function drawBase() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (showGrid) drawGrid();
   layers.forEach((layer) => {
     if (layer.visible) {
       ctx.drawImage(layer.canvas, 0, 0);
     }
   });
+}
+
+function drawGrid() {
+  const spacing = 40;
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,0,0,0.08)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= canvas.width; x += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function moveLayer(delta) {
