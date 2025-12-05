@@ -6,6 +6,7 @@ Small in-browser sketch pad. Open `index.html` in your browser and draw with you
 - Brush, Pen, Pencil, Marker, Highlighter, plus an eraser toggle. Each tool has distinct stroke styling (watercolor brush with bristly edges, jittered pencil, dashed highlighter, shadowed marker). Adjust size/opacity to fine-tune each tool.
 - Layer controls live in the left sidebar: add/select layers, move them up/down, hide/show, and delete. Drawing and erasing apply to the active layer.
 - Background button lets you change the canvas color without clearing your strokes.
+- Canvas size controls (+/− and slider) let you expand the workspace up to very large dimensions; hold Space or middle-click to drag/pan around the enlarged canvas. Drawing works across the full surface.
 
 ## Deploying to GitHub Pages
 - Workflow: `.github/workflows/deploy.yml` deploys the repository root to Pages on pushes to `main` (or via manual dispatch).

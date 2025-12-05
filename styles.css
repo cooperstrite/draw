@@ -164,6 +164,10 @@ h1 {
   font-size: 12px;
 }
 
+.zoom-controls .hint {
+  margin-left: 4px;
+}
+
 .control label {
   font-size: 13px;
   color: #dfe6ff;
@@ -241,14 +245,52 @@ button:hover {
   box-shadow: var(--shadow);
 }
 
-canvas {
-  width: 100%;
-  height: min(70vh, 720px);
-  display: block;
-  background: #fff;
+.canvas-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.zoom-controls input[type="range"] {
+  width: 140px;
+}
+
+.zoom-controls .mini {
+  padding: 8px 10px;
+}
+
+.canvas-viewport {
+  position: relative;
+  overflow: auto;
+  min-height: min(70vh, 720px);
+  border-radius: 12px;
+  background: #fff;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+canvas {
+  width: var(--workspace-size, 3200px);
+  height: var(--workspace-size, 3200px);
+  display: block;
   touch-action: none;
+}
+
+.canvas-viewport.panning-ready {
+  cursor: grab;
+}
+
+.canvas-viewport.panning {
+  cursor: grabbing;
 }
 
 .footer {
@@ -290,5 +332,9 @@ canvas {
 
   .layers-panel {
     position: static;
+  }
+
+  .canvas-viewport {
+    min-height: 60vh;
   }
 }

@@ -1,4 +1,5 @@
 const canvas = document.getElementById("canvas");
+const viewport = document.querySelector(".canvas-viewport");
 const ctx = canvas.getContext("2d");
 const colorInput = document.getElementById("color");
 const sizeInput = document.getElementById("size");
@@ -17,6 +18,10 @@ const layerList = document.getElementById("layerList");
 const layerUpBtn = document.getElementById("layerUp");
 const layerDownBtn = document.getElementById("layerDown");
 const deleteLayerBtn = document.getElementById("deleteLayer");
+const zoomRange = document.getElementById("zoomRange");
+const zoomValue = document.getElementById("zoomValue");
+const zoomInBtn = document.getElementById("zoomIn");
+const zoomOutBtn = document.getElementById("zoomOut");
 
 const tools = {
   brush: { widthScale: 1, opacityScale: 1, composite: "source-over", lineCap: "round", mode: "watercolor" },
@@ -36,44 +41,24 @@ let selectedTool = "brush";
 let layers = [];
 let activeLayerId = null;
 let layerCounter = 1;
+let workspaceSize = 3200;
+let spaceHeld = false;
+let isPanning = false;
+let lastPanPoint = { x: 0, y: 0 };
 
 const strokeLayer = document.createElement("canvas");
 const strokeCtx = strokeLayer.getContext("2d");
 
 function createLayer(name, id) {
   const layerCanvas = document.createElement("canvas");
-  layerCanvas.width = canvas.width;
-  layerCanvas.height = canvas.height;
+  layerCanvas.width = workspaceSize;
+  layerCanvas.height = workspaceSize;
   const layerCtx = layerCanvas.getContext("2d");
   return { id: id ?? `layer-${Date.now()}-${Math.random()}`, name, visible: true, canvas: layerCanvas, ctx: layerCtx };
 }
 
 function setCanvasSize() {
-  const { width, height } = canvas.getBoundingClientRect();
-  if (canvas.width === width && canvas.height === height) return;
-
-  const copies = layers.map((layer) => {
-    const temp = document.createElement("canvas");
-    temp.width = layer.canvas.width;
-    temp.height = layer.canvas.height;
-    temp.getContext("2d").drawImage(layer.canvas, 0, 0);
-    return { layer, temp };
-  });
-
-  canvas.width = width;
-  canvas.height = height;
-  strokeLayer.width = width;
-  strokeLayer.height = height;
-
-  layers.forEach((layer, i) => {
-    const copy = copies[i].temp;
-    layer.canvas.width = width;
-    layer.canvas.height = height;
-    layer.ctx.drawImage(copy, 0, 0, width, height);
-  });
-
-  drawBase();
-  saveSnapshot(true);
+  applyWorkspaceSize(workspaceSize, true);
 }
 
 function saveSnapshot(skipTruncate = false) {
@@ -86,7 +71,7 @@ function saveSnapshot(skipTruncate = false) {
     visible: l.visible,
     imageData: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height),
   }));
-  history.push({ background: backgroundColor, activeId: activeLayerId, layers: layerData });
+  history.push({ background: backgroundColor, activeId: activeLayerId, layers: layerData, size: workspaceSize });
   historyStep = history.length - 1;
 }
 
@@ -95,6 +80,9 @@ function restoreSnapshot() {
   const snap = history[historyStep];
   backgroundColor = snap.background;
   backgroundInput.value = backgroundColor;
+  if (snap.size) {
+    applyWorkspaceSize(snap.size, true);
+  }
 
   layers = snap.layers.map((l) => {
     const layer = createLayer(l.name, l.id);
@@ -113,6 +101,7 @@ function restoreSnapshot() {
 }
 
 function startDrawing(e) {
+  if (isPanning || spaceHeld || e.button === 1) return;
   if (!getActiveLayer()) return;
   drawing = true;
   strokePoints = [getPos(e)];
@@ -127,6 +116,7 @@ function stopDrawing() {
 }
 
 function draw(e) {
+  if (isPanning) return;
   if (!drawing) return;
   strokePoints.push(getPos(e));
   renderStroke(false);
@@ -211,10 +201,7 @@ function downloadImage() {
 }
 
 function init() {
-  canvas.width = canvas.getBoundingClientRect().width;
-  canvas.height = canvas.getBoundingClientRect().height;
-  strokeLayer.width = canvas.width;
-  strokeLayer.height = canvas.height;
+  applyWorkspaceSize(workspaceSize, true);
   backgroundColor = backgroundInput.value;
 
   const baseLayer = createLayer(`Layer ${layerCounter++}`);
@@ -301,10 +288,46 @@ layerList.addEventListener("click", (e) => {
   renderLayerList();
 });
 
+if (zoomRange) {
+  zoomRange.addEventListener("input", (e) => {
+    resizeWorkspace(Number(e.target.value));
+  });
+}
+
+zoomInBtn?.addEventListener("click", () => {
+  resizeWorkspace(workspaceSize + 400);
+});
+
+zoomOutBtn?.addEventListener("click", () => {
+  resizeWorkspace(workspaceSize - 400);
+});
+
 canvas.addEventListener("pointerdown", startDrawing);
 canvas.addEventListener("pointermove", draw);
 canvas.addEventListener("pointerup", stopDrawing);
 canvas.addEventListener("pointerleave", stopDrawing);
+
+canvas.addEventListener("pointerdown", startPan);
+canvas.addEventListener("pointermove", panMove);
+canvas.addEventListener("pointerup", stopPan);
+canvas.addEventListener("pointerleave", stopPan);
+canvas.addEventListener("pointercancel", stopPan);
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    spaceHeld = true;
+    viewport?.classList.add("panning-ready");
+  }
+});
+
+document.addEventListener("keyup", (e) => {
+  if (e.code === "Space") {
+    spaceHeld = false;
+    isPanning = false;
+    viewport?.classList.remove("panning");
+    viewport?.classList.remove("panning-ready");
+  }
+});
 
 window.addEventListener("resize", setCanvasSize);
 
@@ -367,6 +390,86 @@ function renderLayerList() {
     .reverse()
     .join("");
   layerList.innerHTML = rows || "<p class='hint'>No layers</p>";
+}
+
+function updateSizeUI() {
+  if (zoomValue) {
+    zoomValue.textContent = `${workspaceSize}px`;
+  }
+  if (zoomRange) {
+    if (workspaceSize > Number(zoomRange.max)) zoomRange.max = workspaceSize;
+    zoomRange.value = workspaceSize;
+  }
+}
+
+function resizeWorkspace(nextSize) {
+  const minSize = 1200;
+  const maxSize = 12000;
+  const target = Math.min(maxSize, Math.max(minSize, Math.round(nextSize)));
+  if (target === workspaceSize) return;
+  const previousSize = workspaceSize;
+  workspaceSize = target;
+  applyWorkspaceSize(workspaceSize);
+  updateSizeUI();
+  // Try to keep viewport centered on the same relative spot.
+  const ratio = workspaceSize / previousSize;
+  if (viewport) {
+    viewport.scrollLeft *= ratio;
+    viewport.scrollTop *= ratio;
+  }
+  saveSnapshot(true);
+}
+
+function applyWorkspaceSize(size, initializing = false) {
+  const targetSize = Math.round(size);
+  workspaceSize = targetSize;
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  canvas.style.setProperty("--workspace-size", `${targetSize}px`);
+  strokeLayer.width = targetSize;
+  strokeLayer.height = targetSize;
+
+  layers.forEach((layer) => {
+    const temp = document.createElement("canvas");
+    temp.width = targetSize;
+    temp.height = targetSize;
+    temp.getContext("2d").drawImage(layer.canvas, 0, 0);
+    layer.canvas = temp;
+    layer.ctx = temp.getContext("2d");
+  });
+
+  drawBase();
+  if (!initializing) {
+    renderLayerList();
+  }
+  updateSizeUI();
+}
+
+function startPan(e) {
+  if (!(spaceHeld || e.button === 1)) return;
+  isPanning = true;
+  lastPanPoint = { x: e.clientX, y: e.clientY };
+  viewport?.classList.add("panning");
+  canvas.setPointerCapture?.(e.pointerId);
+  e.preventDefault();
+}
+
+function panMove(e) {
+  if (!isPanning || !viewport) return;
+  const dx = e.clientX - lastPanPoint.x;
+  const dy = e.clientY - lastPanPoint.y;
+  viewport.scrollLeft -= dx;
+  viewport.scrollTop -= dy;
+  lastPanPoint = { x: e.clientX, y: e.clientY };
+  e.preventDefault();
+}
+
+function stopPan(e) {
+  if (!isPanning) return;
+  isPanning = false;
+  viewport?.classList.remove("panning");
+  canvas.releasePointerCapture?.(e.pointerId);
+  e.preventDefault();
 }
 
 function paintStroke(targetCtx, points, tool, width, color) {

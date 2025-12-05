@@ -80,7 +80,17 @@
     </aside>
     <section class="workspace">
       <div class="canvas-shell">
-        <canvas id="canvas"></canvas>
+        <div class="canvas-toolbar">
+          <div class="zoom-controls" aria-label="Canvas size controls">
+            <button type="button" class="ghost mini" id="zoomOut">−</button>
+            <input type="range" id="zoomRange" min="1200" max="3200" value="3200" step="200">
+            <button type="button" class="ghost mini" id="zoomIn">+</button>
+            <span id="zoomValue" class="hint">3200px</span>
+          </div>
+        </div>
+        <div class="canvas-viewport">
+          <canvas id="canvas"></canvas>
+        </div>
       </div>
     </section>
   </main>
